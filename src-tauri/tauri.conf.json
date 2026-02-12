@@ -5,21 +5,11 @@
   "identifier": "com.greenlaser.google-test",
   "build": {
     "beforeDevCommand": "",
-    "devUrl": "https://miro.com/",
     "beforeBuildCommand": "",
     "frontendDist": null
   },
   "app": {
     "withGlobalTauri": true,
-    "windows": [
-      {
-        "title": "Miro",
-        "width": 1280,
-        "height": 720,
-        "url": "https://miro.com/",
-        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
-      }
-    ],
     "security": {
       "csp": null
     }

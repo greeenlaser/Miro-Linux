@@ -36,11 +36,8 @@
   - with this
     - "beforeDevCommand": "",
   
-  - replace this
+  - remove this line
     - "devUrl": "http://localhost:1420",
-  
-  - with this
-    - "devUrl": "https://www.google.com",
   
   - replace this
     - "beforeBuildCommand": "npm run build",
@@ -53,6 +50,8 @@
   
   -  with this
     - "frontendDist": null,
+  
+  - remove the entire "windows" array block
 
   - replace this
     - "targets": "all",

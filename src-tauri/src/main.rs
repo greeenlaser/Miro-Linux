@@ -1,98 +1,218 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use tauri::Manager;
+use tauri::{WebviewWindowBuilder, WebviewUrl};
 
 fn main() {
     tauri::Builder::default()
-        .setup(|app| {
-            let window = app.get_webview_window("main").unwrap();
+    .setup(|app| {
+        WebviewWindowBuilder::new(
+            app,
+            "main",
+            WebviewUrl::External("https://miro.com".parse().unwrap())
+        )
+        .initialization_script(r#"
+        (() => {
+        //skip running inside iframes
 
-            let _ = window.eval(r#"
-                (() => {
-                    window.open = function (url) {
-                        window.location.href = url;
-                    };
+        if (window.top !== window.self) return;
 
-                    if (document.getElementById('__nav_controls')) return;
+        //new page opens in current page
 
-                    const container = document.createElement('div');
-                    container.id = '__nav_controls';
+        window.open = function (url) {
+        if (url) {
+            window.location.assign(url);
+    }
+    return window;
+    };
 
-                        container.style.cssText = `
-                        position: fixed;
-                        top: 0;
-                        left: 8px;
-                        z-index: 999999;
-                        display: flex;
-                        gap: 6px;
+    document.addEventListener('click', function (e) {
+    const target = e.target instanceof Element ? e.target : null;
+    const link = target?.closest('a[target="_blank"]');
+        if (link && link.href) {
+            e.preventDefault();
+        window.location.href = link.href;
+    }
+    });
 
-                        transform: translateY(-110%);
-                        opacity: 0;
-                        transition:
-                        transform 220ms cubic-bezier(.2,.8,.2,1), opacity 180ms ease;
+        const container = document.createElement('div');
+        container.id = '__nav_controls';
 
-                        pointer-events: none; `;
+        //main container
 
-                    const mkBtn = (label, action) => {
-                        const b = document.createElement('button');
-                        b.textContent = label;
-                        b.style.cssText = `
-                            width: 28px;
-                            height: 28px;
-                            border-radius: 6px;
-                            border: none;
-                            background: rgba(30,30,30,0.85);
-                            color: white;
-                            cursor: pointer; `;
-                        b.onclick = action;
-                        return b;
-                    };
+        container.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 42px;
+        z-index: 999999;
+        display: flex;
+        align-items: center;
+        padding: 0 12px;
 
-                    container.appendChild(mkBtn('←', () => history.back()));
-                    container.appendChild(mkBtn('→', () => history.forward()));
-                    document.body.appendChild(container);
+        background: rgba(20,20,20,0.95);
+        backdrop-filter: blur(6px);
+        `;
 
-                    let visible = false;
-                    let hoveringControls = false;
+        //left-side back and forward buttons
 
-                    const show = () => {
-                        if (visible) return;
-                        visible = true;
-                        container.style.transform = 'translateY(8px)';
-                        container.style.opacity = '1';
-                        container.style.pointerEvents = 'auto';
-                    };
+        const mkBtn = (label, action) => {
+        const b = document.createElement('button');
+        b.textContent = label;
+        b.style.cssText = `
+        width: 30px;
+        height: 30px;
+        border-radius: 6px;
+        border: none;
+        background: rgba(40,40,40,0.9);
+        color: white;
+        cursor: pointer;
+        font-size: 14px;
+        `;
+        b.onclick = action;
+        return b;
+    };
 
-                    const hide = () => {
-                        if (!visible || hoveringControls) return;
-                        visible = false;
-                        container.style.transform = 'translateY(-110%)';
-                        container.style.opacity = '0';
-                        container.style.pointerEvents = 'none';
-                    };
+    const left = document.createElement('div');
+        left.style.display = 'flex';
+        left.style.gap = '6px';
 
-                    container.addEventListener('mouseenter', () => {
-                        hoveringControls = true;
-                    });
+        const backBtn = mkBtn('<', () => history.back());
+        const forwardBtn = mkBtn('>', () => history.forward());
 
-                    container.addEventListener('mouseleave', () => {
-                        hoveringControls = false;
-                    });
+        left.appendChild(backBtn);
+        left.appendChild(forwardBtn);
 
-                    document.addEventListener('mousemove', (e) => {
-                        // --- hysteresis zones ---
-                        const showZone = e.clientX < 90 && e.clientY < 50;
-                        const hideZone = e.clientX > 130 || e.clientY > 80;
+        //center read-only url bar
 
-                        if (showZone) show();
-                        else if (hideZone) hide();
-                    });
-                })();
-            "#);
+        const urlBar = document.createElement('input');
+        urlBar.type = 'text';
+        urlBar.value = location.href;
 
-            Ok(())
-        })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        urlBar.style.cssText = `
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 50%;
+        max-width: 600px;
+        height: 28px;
+        border-radius: 6px;
+        border: none;
+        padding: 0 18px;
+        background: rgba(60,60,60,0.9);
+        color: white;
+        text-align: center;
+        font-size: 13px;
+        `;
+
+        const updateUrl = () => {
+        urlBar.value = location.href;
+    };
+
+    urlBar.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        let value = urlBar.value.trim();
+
+        if (!value.startsWith('http://') && !value.startsWith('https://')) {
+            value = 'https://' + value;
+    }
+
+    window.location.href = value;
+    }
+    })
+
+        const updateNavButtons = () => {
+        backBtn.disabled = history.length <= 1;
+        backBtn.style.opacity = backBtn.disabled ? "0.4" : "1";
+
+        forwardBtn.disabled = false;
+        forwardBtn.style.opacity = "1";
+    };
+
+    window.addEventListener('popstate', () => {
+    updateUrl();
+        updateNavButtons();
+    });
+
+        window.addEventListener('hashchange', () => {
+        updateUrl();
+        updateNavButtons();
+    });
+
+        const push = history.pushState;
+        history.pushState = function () {
+        push.apply(this, arguments);
+        updateUrl();
+        updateNavButtons();
+    };
+
+    const replace = history.replaceState;
+    history.replaceState = function () {
+    replace.apply(this, arguments);
+        updateUrl();
+        updateNavButtons();
+    };
+
+    //right-side home button
+
+    const homeBtn = mkBtn('🏠', () => {
+    window.location.href = "https://miro.com";
+    });
+
+        homeBtn.style.marginLeft = "auto";
+        homeBtn.style.marginRight = "24px";
+
+        //final setup
+
+        const injectUI = () => {
+        if (document.getElementById('__nav_controls')) return;
+
+        container.appendChild(left);
+        container.appendChild(urlBar);
+        container.appendChild(homeBtn);
+
+        document.body.prepend(container);
+
+        const style = document.createElement("style");
+        style.textContent = `
+        body > *:not(#__nav_controls) {
+        margin-top: 42px !important;
+    }
+    `;
+    document.head.appendChild(style);
+
+        updateNavButtons();
+    };
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", injectUI);
+    } else {
+        injectUI();
+    }
+
+    //ensure UI stays alive even with full document rebuild
+
+    const ensureChromeAlive = () => {
+    if (!document.getElementById('__nav_controls')) {
+        injectUI();
+    }
+    };
+
+    const observer = new MutationObserver(() => {
+    ensureChromeAlive();
+    });
+
+        observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true
+    });
+    })();
+        "#)
+        .build()?;
+
+        Ok(())
+    })
+    .run(tauri::generate_context!())
+    .expect("error while running tauri application");
 }
