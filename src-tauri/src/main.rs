@@ -11,12 +11,9 @@ fn main() {
             "main",
             WebviewUrl::External("https://miro.com".parse().unwrap())
         )
+        .title("Miro")
         .initialization_script(r#"
             (() => {
-                //skip running inside iframes
-
-                if (window.top !== window.self) return;
-
                 //new page opens in current page
 
                 window.open = function (url) {
@@ -38,7 +35,9 @@ fn main() {
                 const container = document.createElement('div');
                 container.id = '__nav_controls';
 
-                //main container
+                //
+                // MAIN CONTAINER
+                //
 
                 container.style.cssText = `
                     position: fixed;
@@ -53,9 +52,15 @@ fn main() {
 
                     background: rgba(20,20,20,0.95);
                     backdrop-filter: blur(6px);
+
+                    opacity: 0;
+                    pointer-events: none;
+                    transition: opacity 160ms ease;
                 `;
 
-                //left-side back and forward buttons
+                //
+                // LEFT-SIDE BACK AND FORWARD BUTTONS
+                //
 
                 const mkBtn = (label, action) => {
                     const b = document.createElement('button');
@@ -84,7 +89,9 @@ fn main() {
                 left.appendChild(backBtn);
                 left.appendChild(forwardBtn);
 
-                //center read-only url bar
+                //
+                // CENTER URL BAR
+                //
 
                 const urlBar = document.createElement('input');
                 urlBar.type = 'text';
@@ -154,7 +161,9 @@ fn main() {
                     updateNavButtons();
                 };
 
-                //right-side home button
+                //
+                // RIGHT-SIDE HOME BUTTON
+                //
 
                 const homeBtn = mkBtn('🏠', () => {
                     window.location.href = "https://miro.com";
@@ -163,7 +172,9 @@ fn main() {
                 homeBtn.style.marginLeft = "auto";
                 homeBtn.style.marginRight = "24px";
 
-                //final setup
+                //
+                // APPEND AND DISPLAY UI
+                //
 
                 const injectUI = () => {
                     if (document.getElementById('__nav_controls')) return;
@@ -172,24 +183,12 @@ fn main() {
                     container.appendChild(urlBar);
                     container.appendChild(homeBtn);
 
-                    document.body.prepend(container);
-
-                    const style = document.createElement("style");
-                    style.textContent = `
-                        body > *:not(#__nav_controls) {
-                            margin-top: 42px !important;
-                        }
-                    `;
-                    document.head.appendChild(style);
+                    document.documentElement.appendChild(container);
 
                     updateNavButtons();
                 };
 
-                if (document.readyState === "loading") {
-                    document.addEventListener("DOMContentLoaded", injectUI);
-                } else {
-                    injectUI();
-                }
+                injectUI();
 
                 //ensure UI stays alive even with full document rebuild
 
@@ -206,6 +205,36 @@ fn main() {
                 observer.observe(document.documentElement, {
                     childList: true,
                     subtree: true
+                });
+
+                //
+                // OPACITY UPDATE
+                //
+
+                let visible = false;
+
+                const showBar = () => {
+                    if (visible) return;
+                    visible = true;
+                    container.style.opacity = "1";
+                    container.style.pointerEvents = "auto";
+                };
+
+                const hideBar = () => {
+                    if (!visible) return;
+                    visible = false;
+                    container.style.opacity = "0";
+                    container.style.pointerEvents = "none";
+                };
+
+                document.addEventListener("mousemove", (e) => {
+                    const y = e.clientY;
+
+                    if (!visible && y <= 5) {
+                        showBar();
+                    } else if (visible && y > 50) {
+                        hideBar();
+                    }
                 });
             })();
         "#)
